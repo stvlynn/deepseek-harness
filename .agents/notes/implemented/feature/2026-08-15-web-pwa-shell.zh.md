@@ -10,7 +10,7 @@ Web 安装 manifest 已命名产品并请求全屏界面，但支持 PWA 的浏�
 
 ## 决策
 
-生产 Vite 构建在写入 dist 之后由 `apps/web/pwa-shell-plugin.ts` 生成 `/sw.js`。该 worker：
+生产 Vite 构建在 dist 目录写入之后由 `apps/web/pwa-shell-plugin.ts` 生成 `/sw.js`。插件相对 Vite root 解析 `outDir`，目录不存在时跳过写出。该 worker：
 
 - 只预缓存外壳：`index.html`、带哈希的 JS/CSS、`favicon.svg`、PNG 图标、`manifest.webmanifest` 和 `offline.html`；
 - 不拦截 `/api`（含 `/api/auth`），因此 RPC 与 OAuth 保持仅网络；

@@ -10,7 +10,7 @@ The Web install manifest named the product and requested fullscreen chrome, but 
 
 ## Decision
 
-The production Vite build emits `/sw.js` from `apps/web/pwa-shell-plugin.ts` after dist is written. The worker:
+The production Vite build emits `/sw.js` from `apps/web/pwa-shell-plugin.ts` after the dist directory is written. The plugin resolves `outDir` against the Vite root and skips emit when that directory is absent. The worker:
 
 - precaches the shell only: `index.html`, hashed JS/CSS, `favicon.svg`, PNG icons, `manifest.webmanifest`, and `offline.html`;
 - does not intercept `/api` (including `/api/auth`), so RPC and OAuth stay network-only;

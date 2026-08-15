@@ -5,8 +5,8 @@
  * network-only. Document navigations fall back to `offline.html`.
  */
 import { createHash } from 'node:crypto'
-import { readdir, writeFile } from 'node:fs/promises'
-import { join, relative, sep } from 'node:path'
+import { access, readdir, writeFile } from 'node:fs/promises'
+import { join, relative, resolve as resolvePath, sep } from 'node:path'
 import type { Plugin } from 'vite'
 
 const SKIP_EXT = new Set(['.map'])
@@ -104,9 +104,15 @@ export function pwaShell(): Plugin {
     name: 'dsh-pwa-shell',
     apply: 'build',
     configResolved(config) {
-      outDir = config.build.outDir
+      outDir = resolvePath(config.root, config.build.outDir)
     },
-    async closeBundle() {
+    async writeBundle() {
+      try {
+        await access(outDir)
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
+        throw error
+      }
       const urls = await listPrecacheUrls(outDir, outDir)
       const cacheName = `dsh-shell-${createHash('sha256').update(urls.join('\n')).digest('hex').slice(0, 12)}`
       await writeFile(join(outDir, 'sw.js'), serviceWorkerSource(cacheName, urls))
