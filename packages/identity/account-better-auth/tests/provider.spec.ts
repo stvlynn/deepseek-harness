@@ -31,7 +31,7 @@ function fakeWebServer(
 describe('AccountBetterAuth', () => {
   it('loads in mode off on loopback without GitHub secrets', async () => {
     const ctx = new Context()
-    const routes: unknown[] = []
+    const routes: Array<{ path: string; handler: (req: unknown, res: unknown) => void }> = []
     ctx.provide('webServer', fakeWebServer('127.0.0.1', routes))
     const fiber = ctx.plugin(AccountBetterAuth, { githubClientId: '' })
     await fiber.await()
