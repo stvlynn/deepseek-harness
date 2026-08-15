@@ -160,6 +160,8 @@
     { "path": "./packages/session/session-title-all-prompts-llm" },
     { "path": "./packages/session/session-telemetry" },
     { "path": "./packages/identity/anonymous-user-id" },
+    { "path": "./packages/identity/account" },
+    { "path": "./packages/identity/account-better-auth" },
     { "path": "./packages/session/session-telemetry-otel" },
     { "path": "./packages/core/system-prompt" },
     { "path": "./packages/core/agent" },

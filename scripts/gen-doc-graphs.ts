@@ -88,6 +88,7 @@ const GROUP_ORDER = [
   'session-query',
   'session-title',
   'telemetry',
+  'identity',
   'storage',
   'workspace',
   'support',
@@ -187,6 +188,15 @@ const SERVICE_ROLES: ServiceRole[] = [
     implementations: ['credentials-local'],
     consumers: ['llm-deepseek', 'llm-pi-ai', 'apiproxy'],
     note: 'Configuration carries references to secrets; providers own the values. Consumers resolve per operation, so a rotated credential reaches the very next request; the web gateway exposes value-free views and write-only storage.',
+  },
+  {
+    key: 'account',
+    pkg: 'account',
+    title: 'GitHub-authenticated Web accounts',
+    mode: 'seam',
+    implementations: ['account-better-auth'],
+    consumers: ['client-connection', 'host-apiproxy'],
+    note: 'GitHub OAuth binds browser operators to conversation-log ownership; loopback without secrets is mode off. ACP, SDK, and stdio stay process-owned.',
   },
   {
     key: 'sessionTelemetry',

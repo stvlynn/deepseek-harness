@@ -41,7 +41,8 @@ export interface HostApi {
    * applied when a new agent doesn't specify them explicitly, absent when the host configures
    * no explicit default (the adapter falls back internally);
    * attachedSessions = count of currently attached sessions (those with a live agent);
-   * canOpenPath = whether this deployment can hand a path to a user-visible native desktop.
+   * canOpenPath = whether this deployment can hand a path to a user-visible native desktop;
+   * account = optional GitHub-auth snapshot when `ctx.account` is composed.
    */
   describe(request: RpcRequest<{}>): Promise<RpcResponse<{
     version: string
@@ -50,6 +51,10 @@ export interface HostApi {
     model?: string
     attachedSessions: number
     canOpenPath: boolean
+    account?: {
+      mode: 'off' | 'github'
+      principal: { id: string; name: string; image?: string } | null
+    }
   }>>
 
   /**

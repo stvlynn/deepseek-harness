@@ -317,7 +317,8 @@ describe('host domain schemas', () => {
     expect(value).toMatchObject({ provider: 'p', model: 'm', attachedSessions: 2, canOpenPath: true })
     expect(hostDescribeValueSchema.parse({
       version: '1', cwd: '/x', attachedSessions: 0, canOpenPath: false,
-    }).provider).toBeUndefined()
+      account: { mode: 'github', principal: { id: 'u', name: 'Ada' } },
+    }).account).toEqual({ mode: 'github', principal: { id: 'u', name: 'Ada' } })
     expect(() => hostDescribeValueSchema.parse({
       version: '1', cwd: '/x', attachedSessions: 0,
     })).toThrow()

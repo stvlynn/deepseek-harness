@@ -37,6 +37,7 @@ async function loadComposition(): Promise<Context> {
   await writeFile(join(dist, 'app.js'), 'export {}')
   await writeFile(join(dist, 'blob.bin'), 'BLOB')
   await writeFile(join(dist, 'manifest.webmanifest'), '{}')
+  await writeFile(join(dist, 'icon.png'), 'PNG')
   const configPath = join(root, 'cordis.yml')
   await writeFile(configPath, [
     "- name: '@deepseek-ai/dsh-host-webserver'",
@@ -99,6 +100,11 @@ describe('real Loader composition', () => {
       status: 200,
       type: 'application/manifest+json',
       body: '{}',
+    })
+    expect(await request(port, '/icon.png')).toMatchObject({
+      status: 200,
+      type: 'image/png',
+      body: 'PNG',
     })
     await writeFile(join(root!, 'dist', 'app.js'), 'export const rebuilt = true')
     expect(await request(port, '/app.js')).toMatchObject({ status: 200, body: 'export const rebuilt = true' })

@@ -11,6 +11,7 @@ import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
 import { RpcId, type ClientRequest } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type { WebServer, WebRoute, WebUpgradeRoute } from '@deepseek-ai/dsh-host-webserver'
 import { API_PATH, apply, HOST_EVENTS_PATH, inject, MUX_EVENTS_PATH, type HostConnectionHandle } from '../src/index.ts'
+import { MemoryAccount, accountId } from '@deepseek-ai/dsh-account'
 
 /** Structural webServer fake recording both route registries. */
 function fakeHttpServer(
@@ -489,6 +490,84 @@ describe('connection node half over a real HTTP server', () => {
       expect(await call(port, 'settings.describe', `127.0.0.1:${String(port)}`)).toBe(404)
     } finally {
       await close()
+      await dispose()
+    }
+  })
+})
+
+describe('connection GitHub account fence', () => {
+  const alice = { id: accountId('alice'), name: 'Alice' }
+
+  async function mountedGithub(): Promise<{
+    routes: WebRoute[]
+    upgrades: WebUpgradeRoute[]
+    dispose: () => Promise<void>
+  }> {
+    const ctx = new Context()
+    const routes: WebRoute[] = []
+    const upgrades: WebUpgradeRoute[] = []
+    ctx.provide('webServer', fakeHttpServer(routes, upgrades) as WebServer)
+    ctx.provide('apiProxy', {} as unknown as ApiProxy)
+    new MemoryAccount(ctx, [{ principal: alice }])
+    const fiber = ctx.plugin({ inject: [...inject], apply }, { trustedHosts: ['harness.example'] })
+    await fiber.await()
+    return { routes, upgrades, dispose: () => fiber.dispose() }
+  }
+
+  it('returns 401 for a signed-out trusted-host call except host.describe', async () => {
+    const { routes, dispose } = await mountedGithub()
+    const denied = fakeResponse()
+    await routes[0]!.handler(fakeRequest({ host: 'harness.example' }, `${API_PATH}/session.list`), denied.response)
+    expect(denied.state.status).toBe(401)
+    const describe = fakeResponse()
+    await routes[0]!.handler(fakeRequest({ host: 'harness.example' }, `${API_PATH}/host.describe`), describe.response)
+    expect(describe.state.status).toBe(404)
+    const loopback = fakeResponse()
+    await routes[0]!.handler(fakeRequest({ host: '127.0.0.1:3080' }, `${API_PATH}/session.list`), loopback.response)
+    expect(loopback.state.status).toBe(404)
+    await dispose()
+  })
+
+  it('lets a signed-in GitHub principal call privileged methods from a trusted host', async () => {
+    const { routes, dispose } = await mountedGithub()
+    const allowed = fakeResponse()
+    await routes[0]!.handler(
+      fakeRequest({ host: 'harness.example', cookie: 'dsh-account-test=alice' }, `${API_PATH}/settings.describe`),
+      allowed.response,
+    )
+    expect(allowed.state.status).toBe(404)
+    await dispose()
+  })
+
+  it('rejects a signed-out GitHub WebSocket upgrade on a trusted host', async () => {
+    const { upgrades, dispose } = await mountedGithub()
+    const socket = new PassThrough()
+    const chunks: Buffer[] = []
+    socket.on('data', (chunk: Buffer) => { chunks.push(chunk) })
+    const ended = once(socket, 'end')
+    await upgrades[0]!.handler(fakeRequest({
+      host: 'harness.example', origin: 'http://harness.example', 'sec-fetch-site': 'same-origin',
+    }, MUX_EVENTS_PATH), socket, Buffer.alloc(0))
+    await ended
+    expect(Buffer.concat(chunks).toString()).toContain('HTTP/1.1 403 Forbidden')
+    await dispose()
+  })
+
+  it('reads a multi-value cookie header on the upgrade handshake', async () => {
+    const { upgrades, dispose } = await mountedGithub()
+    const socket = new PassThrough()
+    const ended = once(socket, 'end')
+    const req = fakeRequest({
+      host: 'harness.example', origin: 'http://harness.example', 'sec-fetch-site': 'same-origin',
+    }, MUX_EVENTS_PATH)
+    Object.assign(req, { headers: { ...req.headers, cookie: ['dsh-account-test=alice'] } })
+    // A matching principal still reaches the downlink; the empty proxy then
+    // fails the upgrade, which closes the socket.
+    try {
+      await upgrades[0]!.handler(req, socket, Buffer.alloc(0))
+      await Promise.race([ended, new Promise((resolve) => { setTimeout(resolve, 50) })])
+    } finally {
+      socket.destroy()
       await dispose()
     }
   })

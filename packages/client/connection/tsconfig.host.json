@@ -24,6 +24,9 @@
       "path": "../../host/apiproxy"
     },
     {
+      "path": "../../identity/account"
+    },
+    {
       "path": "../../host/webserver"
     },
     {

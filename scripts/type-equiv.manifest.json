@@ -1924,6 +1924,31 @@
       "doc": "docs/subsystems/feedback.md",
       "symbol": "MessageFeedbackDeleteResult",
       "source": "packages/feedback/message-feedback/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/identity.md",
+      "symbol": "AccountId",
+      "source": "packages/identity/account/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/identity.md",
+      "symbol": "OwnedConversationId",
+      "source": "packages/identity/account/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/identity.md",
+      "symbol": "AccountMode",
+      "source": "packages/identity/account/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/identity.md",
+      "symbol": "Principal",
+      "source": "packages/identity/account/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/identity.md",
+      "symbol": "AccountSnapshot",
+      "source": "packages/identity/account/src/types.ts"
     }
   ]
 }

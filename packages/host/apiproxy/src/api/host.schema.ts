@@ -18,6 +18,14 @@ export const hostDescribeValueSchema = z.object({
   model: z.string().optional(),
   attachedSessions: z.number().int().nonnegative(),
   canOpenPath: z.boolean(),
+  account: z.object({
+    mode: z.enum(['off', 'github']),
+    principal: z.object({
+      id: z.string(),
+      name: z.string(),
+      image: z.string().optional(),
+    }).nullable(),
+  }).optional(),
 }) satisfies z.ZodType<Wire<ResponseValue<'host.describe'>>>
 
 /** host.pickDirectory request payload (empty object literal). */

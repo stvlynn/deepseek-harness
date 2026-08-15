@@ -10,6 +10,7 @@ import { bridge, DEFAULT_MAX_REQUEST_BODY_BYTES } from './http-bridge.ts'
 import { assertTrustedAuthority, isTrustedApiRequest } from './api-request-trust.ts'
 import { HostConnectionService } from './rpc-host.ts'
 import { rejectWebSocketUpgrade, WebSocketDownlinks } from './websocket-downlink.ts'
+import type {} from '@deepseek-ai/dsh-account'
 
 export type {
   ConnectionRpcAuthority,
@@ -75,8 +76,8 @@ export const Config: z<ConnectionConfig> = z.object({
  * environment-variable name is configured and where from, which is
  * reconnaissance no anonymous caller should have. `trustedHosts` is a
  * DNS-rebinding fence, explicitly not authentication, so the whole
- * configuration plane stays loopback-same-origin until a real authentication
- * layer exists. `llm.discoverModels` belongs to that plane on both counts: it
+ * configuration plane stays loopback-same-origin unless `ctx.account` has a
+ * signed-in GitHub principal. `llm.discoverModels` belongs to that plane on both counts: it
  * carries a draft credential, and it makes the HOST issue a GET to a URL the
  * caller chose and reports back the status or the parsed body — an anonymous
  * LAN caller would have a probe for whatever the host can reach and the
@@ -123,7 +124,10 @@ const PRIVILEGED_METHODS = new Set([
  * the prefix passes the browser-trust fence first (DNS-rebinding and
  * cross-site defense — [api-request-trust](./api-request-trust.ts));
  * privileged methods additionally pass it with an empty trust list, which
- * pins them to loopback.
+ * pins them to loopback. When `ctx.account` is in GitHub mode, a signed-in
+ * principal may call privileged methods from a trusted host, and a
+ * non-loopback caller without a principal receives 401 (except `host.describe`,
+ * which the account UI reads while signed out).
  * @param ctx - Host plugin context.
  * @param config - resolved plugin config (schema defaults applied).
  */
@@ -142,9 +146,21 @@ export function apply(ctx: Context, config?: ConnectionConfig): void {
       const method = pathname.startsWith(`${API_PATH}/`)
         ? pathname.slice(API_PATH.length + 1)
         : undefined
+      const account = ctx.get('account')
+      const principal = account !== undefined && account.mode === 'github'
+        ? await account.readPrincipalFromRequest(request)
+        : undefined
+      const loopback = isTrustedApiRequest(request, [])
+      if (account !== undefined && account.mode === 'github'
+        && principal === undefined
+        && !loopback
+        && method !== 'host.describe') {
+        return new Response('unauthorized', { status: 401 })
+      }
       if (method !== undefined
         && PRIVILEGED_METHODS.has(method)
-        && !isTrustedApiRequest(request, [])) {
+        && !loopback
+        && principal === undefined) {
         return new Response('forbidden', { status: 403 })
       }
       if (request.method === 'GET' && (pathname === MUX_EVENTS_PATH || pathname === HOST_EVENTS_PATH)) {
@@ -155,7 +171,8 @@ export function apply(ctx: Context, config?: ConnectionConfig): void {
       }
       const apiProxy = ctx.get('apiProxy')
       if (apiProxy === undefined) return new Response('not found', { status: 404 })
-      return toFetchHandler(apiProxy).fetch(request)
+      const dispatch = (): Promise<Response> => toFetchHandler(apiProxy).fetch(request)
+      return account === undefined ? dispatch() : account.runWithPrincipal(principal, dispatch)
     },
   })
   const route: WebRoute = {
@@ -185,6 +202,17 @@ export function apply(ctx: Context, config?: ConnectionConfig): void {
             rejectWebSocketUpgrade(socket)
             return
           }
+          const account = apiCtx.get('account')
+          if (account !== undefined && account.mode === 'github' && !isTrustedApiRequest(req, [])) {
+            void account.readPrincipalFromRequest(requestFromNode(req)).then((principal) => {
+              if (principal === undefined) {
+                rejectWebSocketUpgrade(socket)
+                return
+              }
+              account.runWithPrincipal(principal, () => handle(req, socket, head))
+            })
+            return
+          }
           return handle(req, socket, head)
         },
       }), `client-connection: ${path} WebSocket`)
@@ -192,5 +220,24 @@ export function apply(ctx: Context, config?: ConnectionConfig): void {
     apiCtx.effect(() => () => downlinks.close(), 'client-connection: WebSocket downlinks')
     registerDownlink(MUX_EVENTS_PATH, (req, socket, head) => { downlinks.handleMux(req, socket, head) })
     registerDownlink(HOST_EVENTS_PATH, (req, socket, head) => { downlinks.handleHost(req, socket, head) })
+  })
+}
+
+/**
+ * Build a Fetch Request from a node:http upgrade so account cookies can be
+ * read with the same helper as unary `/api` calls.
+ * @param req - upgrade handshake.
+ * @returns a GET Request carrying the handshake headers.
+ */
+function requestFromNode(req: import('node:http').IncomingMessage): Request {
+  const host = typeof req.headers.host === 'string' ? req.headers.host : '127.0.0.1'
+  const headers = new Headers()
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (typeof value === 'string') headers.set(key, value)
+    else if (Array.isArray(value)) headers.set(key, value.join(', '))
+  }
+  return new Request(`http://${host}${req.url ?? '/'}`, {
+    method: req.method ?? 'GET',
+    headers,
   })
 }

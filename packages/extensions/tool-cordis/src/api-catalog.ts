@@ -82,6 +82,72 @@ export interface TypeApiEntry {
 /** Every harness `ctx.<key>` service, sorted by key. */
 export const SERVICE_API: readonly ServiceApiEntry[] = [
   {
+    key: 'account',
+    summary: 'Abstract account service.',
+    description: 'Abstract account service. Providers implement HTTP auth, cookie principals, and conversation ownership. `currentPrincipal` reads the request-scoped AsyncLocalStorage slot that runWithPrincipal installs; it is empty outside that scope.',
+    methods: [
+      {
+        signature: 'abstract readonly mode: AccountMode',
+        description: 'Active authentication mode for this process.',
+        parameters: [],
+      },
+      {
+        signature: 'snapshot(): AccountSnapshot',
+        description: 'Snapshot for `host.describe` and the account UI. `principal` is the current request-scoped value, or `null` when signed out / mode `off`.',
+        parameters: [],
+        returns: 'the public account snapshot.',
+      },
+      {
+        signature: 'currentPrincipal(): Principal | undefined',
+        description: 'Principal installed by runWithPrincipal for this async context.',
+        parameters: [],
+        returns: 'the principal, or `undefined` outside a request scope or when signed out.',
+      },
+      {
+        signature: 'runWithPrincipal<T>(principal: Principal | undefined, fn: () => T): T',
+        description: 'Run `fn` with `principal` as currentPrincipal for the async continuation. Nested calls replace the slot for their duration.',
+        parameters: [{ name: 'principal', description: 'signed-in operator, or `undefined` when signed out.' }, { name: 'fn', description: 'work that may read {@link currentPrincipal}.' }],
+        returns: '`fn`\'s return value.',
+      },
+      {
+        signature: 'abstract readPrincipalFromRequest(request: Request): Promise<Principal | undefined>',
+        description: 'Resolve a signed-in principal from one Fetch request\'s cookies.',
+        parameters: [{ name: 'request', description: 'same-origin `/api` request that may carry the auth cookie.' }],
+        returns: 'the principal, or `undefined` when signed out or mode is `off`.',
+      },
+      {
+        signature: 'abstract handleAuthHttp(req: IncomingMessage, res: ServerResponse): Promise<void>',
+        description: 'Handle one node:http request under ACCOUNT_AUTH_PATH.',
+        parameters: [{ name: 'req', description: 'incoming HTTP request.' }, { name: 'res', description: 'HTTP response the provider owns to completion.' }],
+        returns: 'after the response is written.',
+      },
+      {
+        signature: 'abstract recordConversationOwner(owner: AccountId, conversationId: OwnedConversationId): Promise<void>',
+        description: 'Durably bind a conversation-log id to `accountId`. A matching existing row is a no-op. A row owned by a different account is refused.',
+        parameters: [{ name: 'owner', description: 'the account that may see this conversation.' }, { name: 'conversationId', description: 'conversation-log id to bind.' }],
+        returns: 'after the ownership row commits.',
+      },
+      {
+        signature: 'abstract conversationOwner(conversationId: OwnedConversationId): AccountId | undefined',
+        description: 'Owner of one conversation-log id.',
+        parameters: [{ name: 'conversationId', description: 'conversation-log id to look up.' }],
+        returns: 'the owning account, or `undefined` when unowned.',
+      },
+      {
+        signature: 'abstract conversationIdsOwnedBy(owner: AccountId): readonly OwnedConversationId[]',
+        description: 'Conversation-log ids bound to one account.',
+        parameters: [{ name: 'owner', description: 'the account whose conversations to list.' }],
+        returns: 'the bound ids in insertion order.',
+      },
+      {
+        signature: 'mayAccessConversation(conversationId: OwnedConversationId, allowClaim: boolean): boolean',
+        description: 'Whether `principal` may use `conversationId`. Unowned conversations are visible only while signed out. Signed-in operators see only their own. Mode `off` allows every id.',
+        parameters: [{ name: 'conversationId', description: 'conversation-log id under consideration.' }, { name: 'allowClaim', description: 'when true, a signed-in operator may bind an unowned id.' }],
+        returns: 'whether the current principal may proceed.',
+      },
+    ],
+  },
+  {
     key: 'agentDefaultModel',
     summary: 'Owns the default model selection independently of any Host or transport.',
     description: 'Owns the default model selection independently of any Host or transport. The composition entry remains usable without a settings provider; when one is mounted, its user layer is read live.',
@@ -2158,6 +2224,14 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
 /** Every harness event, sorted by name. */
 export const EVENT_API: readonly EventApiEntry[] = [
   {
+    name: 'account/conversation-owned',
+    mode: 'emit',
+    signature: '\'account/conversation-owned\'(accountId: AccountId, conversationId: OwnedConversationId): void',
+    summary: 'A conversation-log id was durably bound to an account.',
+    description: 'A conversation-log id was durably bound to an account. Emitted only after the ownership row commits. Listener failures are contained except `INVARIANT`-coded failures, which rethrow after every listener ran.',
+    parameters: [{ name: 'accountId', description: 'the owning account.' }, { name: 'conversationId', description: 'the bound conversation-log id.' }],
+  },
+  {
     name: 'agent-loop/config-start-failed',
     mode: 'emit',
     signature: '\'agent-loop/config-start-failed\'(payload: { sessionId: SessionId; error: unknown }): void',
@@ -2609,6 +2683,18 @@ export const EVENT_API: readonly EventApiEntry[] = [
 
 /** Shapes of every exported type the Service and Event signatures reference (transitively), sorted by name. */
 export const TYPE_API: readonly TypeApiEntry[] = [
+  {
+    name: 'AccountId',
+    declaration: 'export type AccountId = Branded<\'AccountId\'>;',
+  },
+  {
+    name: 'AccountMode',
+    declaration: 'export type AccountMode = \'off\' | \'github\';',
+  },
+  {
+    name: 'AccountSnapshot',
+    declaration: 'export interface AccountSnapshot {\n    mode: AccountMode;\n    principal: Principal | null;\n}',
+  },
   {
     name: 'AdapterRegistrationHandle',
     declaration: 'export interface AdapterRegistrationHandle {\n    (): void;\n    replace(providers: string[]): void;\n}',
@@ -3474,6 +3560,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface OneShotSubagentDescriptorData extends SubagentDescriptorBase {\n    readonly mode: \'one-shot\';\n    readonly label?: string;\n}',
   },
   {
+    name: 'OwnedConversationId',
+    declaration: 'export type OwnedConversationId = Branded<\'OwnedConversationId\'>;',
+  },
+  {
     name: 'PermissionSelect',
     declaration: 'export interface PermissionSelect {\n    options: PresetOption[];\n    currentValue: string;\n}',
   },
@@ -3512,6 +3602,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'PreToolDecision',
     declaration: 'export type PreToolDecision = {\n    kind: \'allow\';\n} | {\n    kind: \'deny\';\n    reason: string;\n} | {\n    kind: \'ask\';\n    reason?: string;\n};',
+  },
+  {
+    name: 'Principal',
+    declaration: 'export interface Principal {\n    id: AccountId;\n    name: string;\n    image?: string;\n}',
   },
   {
     name: 'ProjectionChangeListener',

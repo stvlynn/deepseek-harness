@@ -162,6 +162,14 @@
         # its literals, for example: ['app.internal', ...ctx.webRuntime.trustedHosts].
         trustedHosts: !!js ctx.webRuntime.trustedHosts
 
+    - id: account-better-auth
+      name: '@deepseek-ai/dsh-account-better-auth'
+      config:
+        githubClientId: !!js process.env.GITHUB_CLIENT_ID ?? ''
+        githubClientSecretRef: GITHUB_CLIENT_SECRET
+        secretRef: BETTER_AUTH_SECRET
+        baseURL: !!js process.env.DSH_ACCOUNT_BASE_URL ?? ''
+
     - id: api-remotes
       name: '@deepseek-ai/dsh-api-remotes'
 
@@ -182,6 +190,9 @@
 
     - id: ui-sidebar
       name: '@deepseek-ai/dsh-client-ui-sidebar'
+
+    - id: ui-account
+      name: '@deepseek-ai/dsh-client-ui-account'
 
     - id: ui-settings
       name: '@deepseek-ai/dsh-client-ui-settings'
