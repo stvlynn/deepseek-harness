@@ -23,7 +23,7 @@ import type {} from '@deepseek-ai/dsh-host-webserver'
 import { betterAuth } from 'better-auth'
 import { toNodeHandler } from 'better-auth/node'
 import { ConversationOwnershipStore } from './ownership.ts'
-import { principalFromUser } from './principal.ts'
+import { principalFromSession } from './principal.ts'
 import { resolve, type Config, type Spec } from './resolve.ts'
 
 export type { Config, Spec } from './resolve.ts'
@@ -146,12 +146,7 @@ export default class AccountBetterAuth extends AccountService {
       },
     })
     this.nodeHandler = toNodeHandler(auth)
-    this.readSession = async (headers) => {
-      const session = await auth.api.getSession({ headers })
-      const user = session?.user
-      if (user === undefined) return undefined
-      return principalFromUser(user)
-    }
+    this.readSession = async headers => principalFromSession(await auth.api.getSession({ headers }))
     this.ctx.effect(() => this.ctx.webServer.register({
       kind: 'prefix',
       path: ACCOUNT_AUTH_PATH,

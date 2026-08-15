@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { principalFromUser } from '../src/principal.ts'
+import { principalFromSession, principalFromUser } from '../src/principal.ts'
 
 describe('principalFromUser', () => {
   it('returns undefined for an empty user id', () => {
@@ -15,5 +15,17 @@ describe('principalFromUser', () => {
   it('keeps a non-empty image URL', () => {
     expect(principalFromUser({ id: 'u', name: 'Ada', image: 'https://avatars.example/a.png' }))
       .toEqual({ id: 'u', name: 'Ada', image: 'https://avatars.example/a.png' })
+  })
+})
+
+describe('principalFromSession', () => {
+  it('returns undefined without a session user', () => {
+    expect(principalFromSession(undefined)).toBeUndefined()
+    expect(principalFromSession(null)).toBeUndefined()
+    expect(principalFromSession({})).toBeUndefined()
+  })
+
+  it('maps a session user', () => {
+    expect(principalFromSession({ user: { id: 'u', name: 'Ada' } })).toEqual({ id: 'u', name: 'Ada' })
   })
 })

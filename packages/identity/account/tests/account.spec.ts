@@ -41,6 +41,7 @@ describe('MemoryAccount', () => {
       .rejects.toThrow('owned by another account')
     expect(account.conversationOwner(conversation)).toBe(alice.id)
     expect(account.conversationIdsOwnedBy(alice.id)).toEqual([conversation])
+    expect(account.conversationIdsOwnedBy(bob.id)).toEqual([])
     expect(owned).toEqual([[alice.id, conversation]])
   })
 

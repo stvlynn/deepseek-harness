@@ -7,7 +7,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
-import { AccountService } from './index.ts'
+import { AccountService } from './service.ts'
 import type { AccountId, AccountMode, OwnedConversationId, Principal } from './types.ts'
 
 /** Seed one in-memory principal that `readPrincipalFromRequest` returns when the cookie matches. */

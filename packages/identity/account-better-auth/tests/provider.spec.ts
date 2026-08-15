@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import type { WebServer } from '@deepseek-ai/dsh-host-webserver'
-import { ACCOUNT_AUTH_PATH } from '@deepseek-ai/dsh-account'
+import { ACCOUNT_AUTH_PATH, accountId, ownedConversationId } from '@deepseek-ai/dsh-account'
 import AccountBetterAuth from '../src/index.ts'
 
 let dir: string | undefined
@@ -14,11 +14,14 @@ afterEach(async () => {
   dir = undefined
 })
 
-function fakeWebServer(host: '127.0.0.1' | '0.0.0.0', routes: unknown[] = []): WebServer {
+function fakeWebServer(
+  host: '127.0.0.1' | '0.0.0.0',
+  routes: Array<{ path: string; handler: (req: unknown, res: unknown) => void }> = [],
+): WebServer {
   return {
     host,
     port: 3080,
-    register(route: unknown) {
+    register(route: { path: string; handler: (req: unknown, res: unknown) => void }) {
       routes.push(route)
       return () => { routes.splice(routes.indexOf(route), 1) }
     },
@@ -40,6 +43,34 @@ describe('AccountBetterAuth', () => {
     await account.handleAuthHttp({} as never, res as never)
     expect(res.status).toBe(404)
     await fiber.dispose()
+  })
+
+  it('reports mode off before init', () => {
+    const ctx = new Context()
+    ctx.provide('webServer', fakeWebServer('127.0.0.1'))
+    expect(new AccountBetterAuth(ctx, {}).mode).toBe('off')
+  })
+
+  it('fails GitHub mode when the sqlite path is an existing directory', async () => {
+    dir = await mkdtemp(join(tmpdir(), 'dsh-account-ba-dir-'))
+    const previousSecret = process.env.GITHUB_CLIENT_SECRET
+    const previousAuth = process.env.BETTER_AUTH_SECRET
+    process.env.GITHUB_CLIENT_SECRET = 'github-secret-value'
+    process.env.BETTER_AUTH_SECRET = 'auth-secret-value-at-least-32-chars!!'
+    const ctx = new Context()
+    ctx.provide('webServer', fakeWebServer('127.0.0.1'))
+    try {
+      await expect(ctx.plugin(AccountBetterAuth, {
+        githubClientId: 'ov',
+        databasePath: dir,
+        baseURL: 'http://127.0.0.1:3080',
+      }).await()).rejects.toThrow()
+    } finally {
+      if (previousSecret === undefined) delete process.env.GITHUB_CLIENT_SECRET
+      else process.env.GITHUB_CLIENT_SECRET = previousSecret
+      if (previousAuth === undefined) delete process.env.BETTER_AUTH_SECRET
+      else process.env.BETTER_AUTH_SECRET = previousAuth
+    }
   })
 
   it('fails all-interface bind without GitHub config at load', async () => {
@@ -72,7 +103,7 @@ describe('AccountBetterAuth', () => {
     process.env.GITHUB_CLIENT_SECRET = 'github-secret-value'
     process.env.BETTER_AUTH_SECRET = 'auth-secret-value-at-least-32-chars!!'
     const ctx = new Context()
-    const routes: Array<{ path: string }> = []
+    const routes: Array<{ path: string; handler: (req: unknown, res: unknown) => void }> = []
     ctx.provide('webServer', fakeWebServer('127.0.0.1', routes))
     try {
       const fiber = ctx.plugin(AccountBetterAuth, {
@@ -85,7 +116,15 @@ describe('AccountBetterAuth', () => {
       expect(account.mode).toBe('github')
       expect(routes.map(route => route.path)).toEqual([ACCOUNT_AUTH_PATH])
       expect(await account.readPrincipalFromRequest(new Request('http://127.0.0.1/api'))).toBeUndefined()
+      const conversation = ownedConversationId('s1')
+      await account.recordConversationOwner(accountId('alice'), conversation)
+      expect(account.conversationOwner(conversation)).toBe('alice')
+      expect(account.conversationIdsOwnedBy(accountId('alice'))).toEqual([conversation])
       const res = { status: 0, writeHead(code: number) { this.status = code }, end() {} }
+      routes[0]?.handler(
+        { url: '/api/auth/ok', method: 'GET', headers: { host: '127.0.0.1:3080' } },
+        res,
+      )
       try {
         await account.handleAuthHttp(
           { url: '/api/auth/ok', method: 'GET', headers: { host: '127.0.0.1:3080' } } as never,

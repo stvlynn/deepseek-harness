@@ -28,3 +28,14 @@ export function principalFromUser(user: BetterAuthUser): Principal | undefined {
     ...user.image === undefined || user.image === null || user.image.length === 0 ? {} : { image: user.image },
   }
 }
+
+/**
+ * Map a better-auth `getSession` result onto a principal.
+ * @param session - session record, or `null`/`undefined` when signed out.
+ * @returns the principal, or `undefined` when signed out or the user id is empty.
+ */
+export function principalFromSession(session: { user?: BetterAuthUser } | null | undefined): Principal | undefined {
+  const user = session?.user
+  if (user === undefined) return undefined
+  return principalFromUser(user)
+}

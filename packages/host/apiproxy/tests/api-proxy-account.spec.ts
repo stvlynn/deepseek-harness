@@ -91,7 +91,12 @@ describe('api proxy account ownership', () => {
     await ctx.plugin(AgentRegistry)
     const account = new MemoryAccount(ctx)
     const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
-    const created = await account.runWithPrincipal(alice, () => api.sessions.create(request({})))
+    const session = ctx.sessions.create(undefined, { meta: { cwd: '/tmp' } })
+    ctx.agents.register({ id: session.id, session, status: 'idle', ctx } as Agent)
+    const created = await account.runWithPrincipal(alice, () => api.sessions.create(request({
+      sessionId: session.id,
+      cwd: '/tmp',
+    })))
     expect(created.result.ok).toBe(true)
     if (!created.result.ok) throw new Error('unreachable')
     expect(account.conversationOwner(created.result.value.sessionId as never)).toBe(alice.id)

@@ -76,7 +76,7 @@ describe('SignInOverlay', () => {
     render(<SignInOverlay {...overlayProps({ account: { mode: 'github', principal: null } })} />)
     expect(screen.getByRole('dialog', { name: zh.signInTitle })).toBeDefined()
     fireEvent.click(screen.getByRole('button', { name: zh.signInGithub }))
-    expect(await screen.findByRole('alert')).toHaveTextContent(zh.signInError)
+    expect((await screen.findByRole('alert')).textContent).toBe(zh.signInError)
     expect(fetchMock).toHaveBeenCalledWith(
       `${ACCOUNT_AUTH_PATH}/sign-in/social`,
       expect.objectContaining({ method: 'POST' }),
@@ -93,7 +93,7 @@ describe('AccountMenu', () => {
 
   it('offers GitHub sign-in while signed out, including the compact rail', () => {
     render(<AccountMenu {...menuProps({ account: { mode: 'github', principal: null } })} />)
-    expect(screen.getByRole('button', { name: zh.signInGithub })).toHaveTextContent(zh.signInGithub)
+    expect(screen.getByRole('button', { name: zh.signInGithub }).textContent).toBe(zh.signInGithub)
     cleanup()
     render(<AccountMenu {...menuProps({ wide: false, account: { mode: 'github', principal: null } })} />)
     expect(screen.getByRole('button', { name: zh.signInGithub }).textContent).toBe('')
@@ -104,7 +104,7 @@ describe('AccountMenu', () => {
     vi.stubGlobal('fetch', fetchMock)
     render(<AccountMenu {...menuProps({ account: { mode: 'github', principal: null } })} />)
     fireEvent.click(screen.getByRole('button', { name: zh.signInGithub }))
-    expect(await screen.findByRole('alert')).toHaveTextContent(zh.signInError)
+    expect((await screen.findByRole('alert')).textContent).toBe(zh.signInError)
   })
 
   it('opens the signed-in menu and reports a failed sign-out', async () => {
@@ -115,7 +115,7 @@ describe('AccountMenu', () => {
     })} />)
     fireEvent.click(screen.getByRole('button', { name: zh.menuLabel }))
     fireEvent.click(screen.getByText(zh.signOut))
-    expect(await screen.findByRole('alert')).toHaveTextContent(zh.signOutError)
+    expect((await screen.findByRole('alert')).textContent).toBe(zh.signOutError)
   })
 
   it('falls back to initials when the principal has no avatar', () => {
@@ -123,7 +123,7 @@ describe('AccountMenu', () => {
       wide: false,
       account: { mode: 'github', principal: { id: 'u', name: 'Ada' } },
     })} />)
-    expect(screen.getByRole('button', { name: zh.menuLabel })).toHaveTextContent('A')
+    expect(screen.getByRole('button', { name: zh.menuLabel }).textContent).toBe('A')
   })
 })
 

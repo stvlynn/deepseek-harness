@@ -22,6 +22,9 @@ describe('ConversationOwnershipStore', () => {
     expect(() => store.record(accountId('bob'), conversation)).toThrow('owned by another account')
     expect(store.ownerOf(conversation)).toBe('alice')
     expect(store.idsOwnedBy(accountId('alice'))).toEqual([conversation])
+    store.record(accountId('bob'), ownedConversationId('s2'))
+    expect(store.idsOwnedBy(accountId('alice'))).toEqual([conversation])
+    expect(store.idsOwnedBy(accountId('bob'))).toEqual([ownedConversationId('s2')])
   })
 
   it('reloads durable rows', async () => {
