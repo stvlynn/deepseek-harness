@@ -35,7 +35,7 @@ function overlayProps(over: {
   const description = over.missing === true ? undefined : host(over.account)
   return {
     isLoopback: over.isLoopback ?? false,
-    useHostDescription: selector => selector(description),
+    useHostDescription: (selector: (value: HostDescription | undefined) => unknown) => selector(description),
     t,
   } as unknown as SignInOverlayProps
 }
@@ -49,7 +49,7 @@ function menuProps(over: {
   return {
     wide: over.wide ?? true,
     isLoopback: true,
-    useHostDescription: selector => selector(description),
+    useHostDescription: (selector: (value: HostDescription | undefined) => unknown) => selector(description),
     t,
   } as unknown as AccountMenuProps
 }
