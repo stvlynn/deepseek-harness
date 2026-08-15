@@ -38,7 +38,7 @@ interface Config {
 }
 ```
 
-`host` accepts only `127.0.0.1` (default posture) and `0.0.0.0` (deliberate network exposure); there is no TLS, auth, or origin policy, so a non-loopback bind exposes the server to that network. The dist location is an assembly fact of the frontend plugin that claims the seat.
+`host` accepts only `127.0.0.1` (default posture) and `0.0.0.0` (deliberate network exposure). The webserver itself has no TLS or origin policy; the Web bundle mounts GitHub accounts at `/api/auth` and gates `/api` on that principal. A non-loopback bind without GitHub config fails at account-provider load. The dist location is an assembly fact of the frontend plugin that claims the seat.
 
 ## The service
 

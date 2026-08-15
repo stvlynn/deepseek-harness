@@ -16,7 +16,7 @@ Web 入口链接 `/manifest.webmanifest`，Vite 会将其从 `apps/web/public/` 
 
 manifest 有意不包含 `lang`、`theme_color` 或 `background_color`。产品界面支持双语，并不由 manifest 中的单一语言定义；任一静态颜色值都可能与应用解析后的一套调色板不一致。因此，主题元数据仍放在安装 manifest 之外。
 
-该功能不添加 service worker、缓存策略或离线回退。manifest 只提供安装元数据；是否具备安装资格、是否提供安装入口仍由浏览器策略决定。实际交付的 [`dsh-host-frontend-static`](../../../../packages/host/frontend-static/README.md) 回退将 `.webmanifest` 识别为 `application/manifest+json`，因此同一资产经实际交付的 HTTP 组合提供时同样有效，而不只在 Vite 输出目录中有效。
+该功能的安装元数据就是这份 manifest。service worker、外壳预缓存和离线回退由 [Web PWA 外壳 Agent Note](2026-08-15-web-pwa-shell.md) 规定；本 Note 不拥有那份约定。实际交付的 [`dsh-host-frontend-static`](../../../../packages/host/frontend-static/README.md) 回退将 `.webmanifest` 识别为 `application/manifest+json`，因此同一资产经实际交付的 HTTP 组合提供时同样有效，而不只在 Vite 输出目录中有效。
 
 ## 验证
 
@@ -24,13 +24,13 @@ Web 构建产物测试解析输出的 manifest，并固定完整的元数据对�
 
 ## 曾考虑的替代方案
 
-**添加 service worker，并宣称应用支持离线。** 不予采纳，因为只缓存应用外壳，却不定义会话传输、失效策略、失败行为和升级语义，会形成具有误导性的不完整离线约定。
+**添加 service worker，并宣称应用支持离线。** 在此处不予采纳，因为只缓存应用外壳，却不定义会话传输、失效策略、失败行为和升级语义，会形成具有误导性的不完整离线约定。随后的 [Web PWA 外壳](2026-08-15-web-pwa-shell.md) Note 仅为可安装外壳提供这些语义，并不推翻本 Note 的安装元数据决策。
 
 **声明单一的 `lang`。** 不予采纳，因为没有任何一种语言足以描述双语产品界面；省略该字段可避免声称安装后的体验由某一种区域设置独占。
 
 **选择一组静态背景色和主题色。** 不予采纳，因为应用会在运行时解析浅色和深色调色板，因此选择任一固定值，都是明知它与其中一种受支持状态不符。
 
-**立即交付光栅和可遮罩图标变体。** 在某个受支持的安装目标证明现有可缩放 favicon 无法满足其要求之前，不予采纳。新变体只是对 manifest 的增量扩展，并非公开当前身份的前提。
+**立即交付光栅和可遮罩图标变体。** Chromium 安装资格所需的 192 与 512 PNG 由 [Web PWA 外壳 Note](2026-08-15-web-pwa-shell.md) 规定。在某个受支持的安装目标证明当前图标无法满足安全区要求之前，可遮罩变体仍是增量扩展。
 
 **只断言构建产物中的根路径字段和显示字段。** 不予采纳，因为产品名称、简称或图标被删除或更改，同样属于已交付安装体验的回归。任何 manifest 元数据发生变化时，测试都有意要求显式改动。
 

@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-15-github-account-seam.md
+2026-08-15-github-account-seam.md: 5094165c717e5e1b3f78e0e41f760f630a827e99
+2026-08-15-github-account-seam.zh.md: 8d1fb2f69dc15e06a92396360130f40dd9335ca3

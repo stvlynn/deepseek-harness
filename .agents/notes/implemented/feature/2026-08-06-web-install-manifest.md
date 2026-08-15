@@ -16,7 +16,7 @@ This follows code-server's fullscreen choice without copying its `window-control
 
 The manifest deliberately has no `lang`, `theme_color`, or `background_color`. The product surface is bilingual rather than owned by one manifest language, and either static color can disagree with one of the resolved app palettes. Theme metadata therefore remains outside the install manifest.
 
-This feature adds no service worker, cache policy, or offline fallback. The manifest supplies install metadata only; browser eligibility and install affordances remain browser policy. The shipped [`dsh-host-frontend-static`](../../../../packages/host/frontend-static/README.md) fallback recognizes `.webmanifest` as `application/manifest+json` so the same asset is valid through the shipped HTTP composition rather than only in Vite's output directory.
+Install metadata remains this manifest. The service worker, shell precache, and offline fallback are specified by [the Web PWA shell Agent Note](2026-08-15-web-pwa-shell.md); this note does not own that contract. The shipped [`dsh-host-frontend-static`](../../../../packages/host/frontend-static/README.md) fallback recognizes `.webmanifest` as `application/manifest+json` so the same asset is valid through the shipped HTTP composition rather than only in Vite's output directory.
 
 ## Verification
 
@@ -24,13 +24,13 @@ The built-Web test parses the emitted manifest and pins the complete metadata ob
 
 ## Alternatives considered
 
-**Add a service worker and call the app offline-capable.** Rejected because caching the shell without defining session transport, invalidation, failure behavior, and upgrade semantics would create a misleading partial offline contract.
+**Add a service worker and call the app offline-capable.** Rejected here because caching the shell without defining session transport, invalidation, failure behavior, and upgrade semantics would create a misleading partial offline contract. The later [Web PWA shell](2026-08-15-web-pwa-shell.md) note supplies those semantics for the installable shell only and does not reverse this note's install-metadata decision.
 
 **Declare one `lang`.** Rejected because no single language describes the bilingual product surface; omission avoids claiming that one locale owns the installed experience.
 
 **Choose one static background and theme color.** Rejected because the app resolves light and dark palettes at runtime, so either fixed value is knowingly wrong for one supported state.
 
-**Ship raster and maskable icon variants immediately.** Rejected until a supported installation target demonstrates a requirement the existing scalable favicon cannot meet. New variants remain an additive manifest change rather than a prerequisite for exposing the current identity.
+**Ship raster and maskable icon variants immediately.** PNG 192 and 512 for Chromium installability are specified by [the Web PWA shell note](2026-08-15-web-pwa-shell.md). Maskable variants remain additive until a supported installation target requires a safe-zone asset the current icons cannot meet.
 
 **Assert only root and display fields in the built artifact.** Rejected because dropping or changing the product name, compact name, or icon is also a shipped install regression. The test intentionally requires an explicit edit whenever any manifest metadata changes.
 

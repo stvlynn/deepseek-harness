@@ -17,6 +17,7 @@ import { errorChain } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, MessageSource } from '@deepseek-ai/dsh-llm'
 import { isAppendSurfaceEvent, isJsonValue } from '@deepseek-ai/dsh-session'
 import type { JsonValue, Session, SessionEvent, SessionEventMap, SessionHeader, SessionId, UserMessage } from '@deepseek-ai/dsh-session'
+import { ownedConversationId } from '@deepseek-ai/dsh-account'
 import type { SessionPersistence } from '@deepseek-ai/dsh-session-persistence'
 import { SessionQueryError, type SessionSearchCursor } from '@deepseek-ai/dsh-session-query'
 import { SubagentError } from '@deepseek-ai/dsh-subagent'
@@ -1621,6 +1622,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     checkPersistedIdentity: boolean,
     presetId?: string,
   ): Promise<Agent> {
+    const account = ctx.get('account')
+    if (account !== undefined && !account.mayAccessConversation(ownedConversationId(sessionId), false)) {
+      throw new SessionNotFound(sessionId)
+    }
     let creation = sessionCreations.get(sessionId)
     if (creation === undefined) {
       creation = (async () => {
@@ -1781,7 +1786,9 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       }
     }
     items.sort((a, b) => b.updatedAt - a.updatedAt)
-    return items
+    const account = ctx.get('account')
+    if (account === undefined) return items
+    return items.filter(item => account.mayAccessConversation(ownedConversationId(item.sessionId), false))
   }
 
   /**
@@ -2166,6 +2173,25 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
 
       async create(request) {
         const sessionId = request.payload.sessionId ?? `session-${randomUUID()}` as SessionId
+        const account = ctx.get('account')
+        const principal = account?.currentPrincipal()
+        if (principal !== undefined && account !== undefined) {
+          try {
+            await account.recordConversationOwner(principal.id, ownedConversationId(sessionId))
+          } catch {
+            return err(request, {
+              code: 'session-not-found',
+              message: `session "${sessionId}" not found`,
+              details: { sessionId },
+            })
+          }
+        } else if (account !== undefined && !account.mayAccessConversation(ownedConversationId(sessionId), false)) {
+          return err(request, {
+            code: 'session-not-found',
+            message: `session "${sessionId}" not found`,
+            details: { sessionId },
+          })
+        }
         let workspace: Workspace | undefined
         if (request.payload.workspaceId !== undefined) {
           workspace = ctx.workspaceRegistry.get(brandWorkspaceId(request.payload.workspaceId))
@@ -2208,6 +2234,13 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           }
           if (error instanceof SubagentSessionOwnership) {
             return err(request, subagentOwnershipError(error.sessionId))
+          }
+          if (error instanceof SessionNotFound) {
+            return err(request, {
+              code: 'session-not-found',
+              message: error.message,
+              details: { sessionId },
+            })
           }
           return err(request, {
             code: 'internal',
@@ -2924,6 +2957,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       describe(request) {
         // TODO: version should read apps/cli's package.json; placeholder for now.
         const selection = defaults.defaultModelSelection()
+        const accountService = ctx.get('account')
         return Promise.resolve(ok(request, {
           version: '0.0.1',
           // Same source as session.create's fallback: the UI's default project
@@ -2935,6 +2969,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           model: selection.model,
           attachedSessions: ctx.agents.list().length,
           canOpenPath: canOpenPaths(),
+          ...accountService === undefined ? {} : { account: accountService.snapshot() },
         }))
       },
 
