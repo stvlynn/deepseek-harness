@@ -141,7 +141,7 @@ abstract conversationIdsOwnedBy(owner: AccountId): readonly OwnedConversationId[
 mayAccessConversation(conversationId: OwnedConversationId, allowClaim: boolean): boolean
 ```
 
-Source: [`packages/identity/account/src/service.ts:50`](../../packages/identity/account/src/service.ts)
+Source: [`packages/identity/account/src/service.ts:51`](../../packages/identity/account/src/service.ts)
 
 <a id="account-events"></a>
 
