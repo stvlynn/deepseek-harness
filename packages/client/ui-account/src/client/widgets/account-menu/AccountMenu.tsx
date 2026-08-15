@@ -23,7 +23,7 @@ export function initials(name: string): string {
   const first = parts[0]
   if (first === undefined) return '?'
   const last = parts.length > 1 ? parts[parts.length - 1] : undefined
-  return `${first[0] ?? '?'}${last?.[0] ?? ''}`.toUpperCase()
+  return `${first.charAt(0)}${last === undefined ? '' : last.charAt(0)}`.toUpperCase()
 }
 
 /**
@@ -89,9 +89,9 @@ export function AccountMenu({ wide, useHostDescription, t }: AccountMenuProps): 
         side="top"
         portal
         onClose={() => { setOpen(false) }}
-        onSelect={(id) => {
+        onSelect={() => {
           setOpen(false)
-          if (id === 'sign-out') onSignOut()
+          onSignOut()
         }}
         items={[{ id: 'sign-out', label: t('signOut'), disabled: pending, danger: true }]}
         anchor={(

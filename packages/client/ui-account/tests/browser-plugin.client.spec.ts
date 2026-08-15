@@ -50,6 +50,21 @@ describe('ui-account browser half', () => {
     expect(inject).toEqual(['slots', 'locale', 'connection'])
   })
 
+  it('injects the connection loopback flag and hostDescription hook into both seats', async () => {
+    const { ctx, fiber } = await bench()
+    const overlay = ctx.slots.entries('shell.overlay').find(entry => entry.options.id === 'account-sign-in')
+    const footer = ctx.slots.entries('sidebar.footer.action').find(entry => entry.options.id === 'account-menu')
+    if (overlay?.inject === undefined || footer?.inject === undefined) throw new Error('expected inject faces')
+    const overlayFace = overlay.inject()
+    const footerFace = footer.inject()
+    expect(overlayFace).toEqual({
+      isLoopback: false,
+      hooks: { hostDescription: expect.any(Object) },
+    })
+    expect(footerFace).toEqual(overlayFace)
+    await fiber.dispose()
+  })
+
   it('registers overlay and footer entries, and fiber teardown removes them', async () => {
     const { ctx, fiber } = await bench()
     expect(overlayIds(ctx)).toContain('account-sign-in')

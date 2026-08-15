@@ -114,6 +114,10 @@ describe('AccountMenu', () => {
       account: { mode: 'github', principal: { id: 'u', name: 'Ada Lovelace', image: 'http://avatar.test/a.png' } },
     })} />)
     fireEvent.click(screen.getByRole('button', { name: zh.menuLabel }))
+    expect(screen.getByRole('menu')).toBeDefined()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('menu')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: zh.menuLabel }))
     fireEvent.click(screen.getByText(zh.signOut))
     expect((await screen.findByRole('alert')).textContent).toBe(zh.signOutError)
   })
