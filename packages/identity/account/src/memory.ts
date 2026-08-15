@@ -39,8 +39,9 @@ export class MemoryAccount extends AccountService {
   override readPrincipalFromRequest(request: Request): Promise<Principal | undefined> {
     const cookie = request.headers.get('cookie') ?? ''
     const match = /(?:^|;\s*)dsh-account-test=([^;]+)/.exec(cookie)
-    if (match === null) return Promise.resolve(undefined)
-    return Promise.resolve(this.principals.get(decodeURIComponent(match[1])))
+    const token = match?.[1]
+    if (token === undefined) return Promise.resolve(undefined)
+    return Promise.resolve(this.principals.get(decodeURIComponent(token)))
   }
 
   override handleAuthHttp(_req: IncomingMessage, res: ServerResponse): Promise<void> {

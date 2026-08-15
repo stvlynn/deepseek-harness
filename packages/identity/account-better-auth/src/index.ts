@@ -79,8 +79,8 @@ async function requireSecret(ctx: Context, ref: string): Promise<string> {
   throw new Error(`account: GitHub mode requires credential ${ref}`)
 }
 
-type AuthInstance = ReturnType<typeof betterAuth>
 type NodeAuthHandler = ReturnType<typeof toNodeHandler>
+type SessionLookup = (headers: Headers) => Promise<Principal | undefined>
 
 /**
  * Account provider. Mode `off` is a no-op principal source so loopback `dsh web`
@@ -99,7 +99,7 @@ export default class AccountBetterAuth extends AccountService {
   static inject = inject
 
   private spec!: Spec
-  private auth: AuthInstance | undefined
+  private readSession: SessionLookup | undefined
   private nodeHandler: NodeAuthHandler | undefined
   private db: DatabaseSync | undefined
   private ownership = new ConversationOwnershipStore(undefined)
@@ -132,7 +132,7 @@ export default class AccountBetterAuth extends AccountService {
     const db = await openAccountDatabase(this.spec.databasePath)
     this.db = db
     this.ownership = new ConversationOwnershipStore(db)
-    this.auth = betterAuth({
+    const auth = betterAuth({
       baseURL: this.spec.baseURL,
       secret,
       database: db,
@@ -145,7 +145,13 @@ export default class AccountBetterAuth extends AccountService {
         },
       },
     })
-    this.nodeHandler = toNodeHandler(this.auth)
+    this.nodeHandler = toNodeHandler(auth)
+    this.readSession = async (headers) => {
+      const session = await auth.api.getSession({ headers })
+      const user = session?.user
+      if (user === undefined) return undefined
+      return principalFromUser(user)
+    }
     this.ctx.effect(() => this.ctx.webServer.register({
       kind: 'prefix',
       path: ACCOUNT_AUTH_PATH,
@@ -155,11 +161,8 @@ export default class AccountBetterAuth extends AccountService {
   }
 
   override async readPrincipalFromRequest(request: Request): Promise<Principal | undefined> {
-    if (this.auth === undefined) return undefined
-    const session = await this.auth.api.getSession({ headers: request.headers })
-    const user = session?.user
-    if (user === undefined) return undefined
-    return principalFromUser(user)
+    if (this.readSession === undefined) return undefined
+    return this.readSession(request.headers)
   }
 
   override handleAuthHttp(req: IncomingMessage, res: ServerResponse): Promise<void> {

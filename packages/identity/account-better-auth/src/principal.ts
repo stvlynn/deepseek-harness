@@ -12,7 +12,7 @@ export interface BetterAuthUser {
   /** Display name. */
   name: string
   /** Optional avatar URL. */
-  image?: string | null
+  image?: string | null | undefined
 }
 
 /**
