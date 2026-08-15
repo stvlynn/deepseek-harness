@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -14,24 +14,33 @@ afterEach(async () => {
   dir = undefined
 })
 
+type AuthRoute = { path: string; handler: (req: unknown, res: unknown) => void | Promise<void> }
+
 function fakeWebServer(
   host: '127.0.0.1' | '0.0.0.0',
-  routes: Array<{ path: string; handler: (req: unknown, res: unknown) => void }> = [],
+  routes: AuthRoute[] = [],
 ): WebServer {
   return {
     host,
     port: 3080,
-    register(route: { path: string; handler: (req: unknown, res: unknown) => void }) {
+    register(route: AuthRoute) {
       routes.push(route)
       return () => { routes.splice(routes.indexOf(route), 1) }
     },
   } as WebServer
 }
 
+function restoreGithubEnv(previousSecret: string | undefined, previousAuth: string | undefined): void {
+  if (previousSecret === undefined) delete process.env.GITHUB_CLIENT_SECRET
+  else process.env.GITHUB_CLIENT_SECRET = previousSecret
+  if (previousAuth === undefined) delete process.env.BETTER_AUTH_SECRET
+  else process.env.BETTER_AUTH_SECRET = previousAuth
+}
+
 describe('AccountBetterAuth', () => {
   it('loads in mode off on loopback without GitHub secrets', async () => {
     const ctx = new Context()
-    const routes: Array<{ path: string; handler: (req: unknown, res: unknown) => void }> = []
+    const routes: AuthRoute[] = []
     ctx.provide('webServer', fakeWebServer('127.0.0.1', routes))
     const fiber = ctx.plugin(AccountBetterAuth, { githubClientId: '' })
     await fiber.await()
@@ -51,8 +60,11 @@ describe('AccountBetterAuth', () => {
     expect(new AccountBetterAuth(ctx, {}).mode).toBe('off')
   })
 
-  it('fails GitHub mode when the sqlite path is an existing directory', async () => {
+  it('fails GitHub mode when the sqlite parent directory is not writable', async () => {
     dir = await mkdtemp(join(tmpdir(), 'dsh-account-ba-dir-'))
+    const locked = join(dir, 'locked')
+    await mkdir(locked, { mode: 0o500 })
+    await chmod(locked, 0o500)
     const previousSecret = process.env.GITHUB_CLIENT_SECRET
     const previousAuth = process.env.BETTER_AUTH_SECRET
     process.env.GITHUB_CLIENT_SECRET = 'github-secret-value'
@@ -62,14 +74,12 @@ describe('AccountBetterAuth', () => {
     try {
       await expect(ctx.plugin(AccountBetterAuth, {
         githubClientId: 'ov',
-        databasePath: dir,
+        databasePath: join(locked, 'account.sqlite'),
         baseURL: 'http://127.0.0.1:3080',
-      }).await()).rejects.toThrow()
+      }).await()).rejects.toMatchObject({ code: 'EACCES' })
     } finally {
-      if (previousSecret === undefined) delete process.env.GITHUB_CLIENT_SECRET
-      else process.env.GITHUB_CLIENT_SECRET = previousSecret
-      if (previousAuth === undefined) delete process.env.BETTER_AUTH_SECRET
-      else process.env.BETTER_AUTH_SECRET = previousAuth
+      await chmod(locked, 0o700)
+      restoreGithubEnv(previousSecret, previousAuth)
     }
   })
 
@@ -103,7 +113,7 @@ describe('AccountBetterAuth', () => {
     process.env.GITHUB_CLIENT_SECRET = 'github-secret-value'
     process.env.BETTER_AUTH_SECRET = 'auth-secret-value-at-least-32-chars!!'
     const ctx = new Context()
-    const routes: Array<{ path: string; handler: (req: unknown, res: unknown) => void }> = []
+    const routes: AuthRoute[] = []
     ctx.provide('webServer', fakeWebServer('127.0.0.1', routes))
     try {
       const fiber = ctx.plugin(AccountBetterAuth, {
@@ -121,25 +131,14 @@ describe('AccountBetterAuth', () => {
       expect(account.conversationOwner(conversation)).toBe('alice')
       expect(account.conversationIdsOwnedBy(accountId('alice'))).toEqual([conversation])
       const res = { status: 0, writeHead(code: number) { this.status = code }, end() {} }
-      routes[0]?.handler(
-        { url: '/api/auth/ok', method: 'GET', headers: { host: '127.0.0.1:3080' } },
-        res,
-      )
-      try {
-        await account.handleAuthHttp(
-          { url: '/api/auth/ok', method: 'GET', headers: { host: '127.0.0.1:3080' } } as never,
-          res as never,
-        )
-      } catch {
-        // better-auth rejects a stub IncomingMessage; mode `off` already covers the 404 branch.
-      }
+      const route = routes[0]
+      if (route === undefined) throw new Error('expected /api/auth route')
+      const stubReq = { url: '/api/auth/ok', method: 'GET', headers: { host: '127.0.0.1:3080' } }
+      await expect(Promise.resolve().then(() => route.handler(stubReq, res))).rejects.toThrow()
       expect(res.status).not.toBe(404)
       await fiber.dispose()
     } finally {
-      if (previousSecret === undefined) delete process.env.GITHUB_CLIENT_SECRET
-      else process.env.GITHUB_CLIENT_SECRET = previousSecret
-      if (previousAuth === undefined) delete process.env.BETTER_AUTH_SECRET
-      else process.env.BETTER_AUTH_SECRET = previousAuth
+      restoreGithubEnv(previousSecret, previousAuth)
     }
   })
 

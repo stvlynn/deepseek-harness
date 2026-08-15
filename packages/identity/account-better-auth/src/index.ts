@@ -150,7 +150,7 @@ export default class AccountBetterAuth extends AccountService {
     this.ctx.effect(() => this.ctx.webServer.register({
       kind: 'prefix',
       path: ACCOUNT_AUTH_PATH,
-      handler: (req, res) => { void this.handleAuthHttp(req, res) },
+      handler: (req, res) => this.handleAuthHttp(req, res),
     }), 'account-better-auth: /api/auth')
     this.ctx.effect(() => () => { this.db?.close() }, 'account-better-auth: sqlite')
   }
